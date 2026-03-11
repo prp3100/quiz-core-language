@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Sora:wght@500;700&display=swap');
+@import 'tailwindcss';
+
+:root {
+  --bg: #f4efe7;
+  --bg-2: #ffe4bf;
+  --ink: #1f1b16;
+  --ink-soft: #4d443a;
+  --accent: #ea5b2a;
+  --card: #fff9f2;
+  --line: #d9c8b5;
+
+  font-family: 'Space Grotesk', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 10% 10%, color-mix(in oklab, var(--bg-2), white 38%) 0%, transparent 42%),
+    radial-gradient(circle at 92% 82%, color-mix(in oklab, var(--accent), white 78%) 0%, transparent 35%),
+    linear-gradient(140deg, var(--bg) 0%, color-mix(in oklab, var(--bg), #ffffff 28%) 100%);
+}
