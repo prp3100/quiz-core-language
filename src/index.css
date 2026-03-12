@@ -2,13 +2,29 @@
 @import 'tailwindcss';
 
 :root {
-  --bg: #f4efe7;
-  --bg-2: #ffe4bf;
-  --ink: #1f1b16;
-  --ink-soft: #4d443a;
-  --accent: #ea5b2a;
-  --card: #fff9f2;
-  --line: #d9c8b5;
+  --bg: #eee2d2;
+  --bg-2: #d8c0aa;
+  --surface: rgba(242, 231, 218, 0.78);
+  --surface-strong: #f3e7da;
+  --surface-soft: rgba(255, 248, 240, 0.72);
+  --surface-raised: rgba(255, 251, 246, 0.78);
+  --surface-hover: rgba(255, 255, 255, 0.92);
+  --ink: #2f251d;
+  --muted: #766757;
+  --soft-on-dark: rgba(244, 232, 218, 0.82);
+  --accent: #b56d4a;
+  --accent-2: #6f9788;
+  --accent-soft: rgba(201, 117, 82, 0.12);
+  --accent-soft-2: rgba(122, 168, 154, 0.12);
+  --line: rgba(69, 53, 39, 0.14);
+  --line-strong: rgba(69, 53, 39, 0.22);
+  --panel-gradient: linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(248, 240, 230, 0.92));
+  --code-bg: #f7efe5;
+  --code-header: rgba(255, 250, 245, 0.88);
+  --code-panel: rgba(255, 255, 255, 0.68);
+  --code-line: rgba(92, 72, 54, 0.12);
+  --code-ink: #2c231b;
+  --code-muted: #7d6a59;
 
   font-family: 'Space Grotesk', sans-serif;
   line-height: 1.5;
@@ -19,14 +35,44 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+:root[data-theme='dark'] {
+  --bg: #171412;
+  --bg-2: #2c221c;
+  --surface: rgba(31, 26, 23, 0.84);
+  --surface-strong: #211b17;
+  --surface-soft: rgba(42, 34, 29, 0.74);
+  --surface-raised: rgba(48, 39, 34, 0.82);
+  --surface-hover: rgba(61, 49, 42, 0.9);
+  --ink: #f5eee7;
+  --muted: #c2b2a2;
+  --soft-on-dark: rgba(245, 238, 231, 0.86);
+  --accent: #f2a071;
+  --accent-2: #8ec4b0;
+  --accent-soft: rgba(242, 160, 113, 0.16);
+  --accent-soft-2: rgba(142, 196, 176, 0.18);
+  --line: rgba(255, 236, 220, 0.1);
+  --line-strong: rgba(255, 236, 220, 0.16);
+  --panel-gradient: linear-gradient(135deg, rgba(48, 39, 34, 0.92), rgba(30, 24, 21, 0.98));
+  --code-bg: #11161c;
+  --code-header: rgba(24, 31, 39, 0.94);
+  --code-panel: rgba(38, 47, 58, 0.84);
+  --code-line: rgba(154, 182, 212, 0.14);
+  --code-ink: #e6edf3;
+  --code-muted: #9fb1c4;
+}
+
 * {
   box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 html,
 body,
 #root {
-  min-height: 100%;
+  min-height: 100vh;
 }
 
 body {
@@ -34,7 +80,79 @@ body {
   min-width: 320px;
   color: var(--ink);
   background:
-    radial-gradient(circle at 10% 10%, color-mix(in oklab, var(--bg-2), white 38%) 0%, transparent 42%),
-    radial-gradient(circle at 92% 82%, color-mix(in oklab, var(--accent), white 78%) 0%, transparent 35%),
-    linear-gradient(140deg, var(--bg) 0%, color-mix(in oklab, var(--bg), #ffffff 28%) 100%);
+    radial-gradient(circle at 12% 14%, color-mix(in oklab, var(--bg-2), white 12%) 0%, transparent 34%),
+    radial-gradient(circle at 84% 18%, color-mix(in oklab, var(--accent-2), white 76%) 0%, transparent 28%),
+    linear-gradient(160deg, color-mix(in oklab, var(--bg), black 2%) 0%, var(--bg) 48%, #e8d9c8 100%);
+  transition: background 220ms ease, color 220ms ease;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(43, 33, 24, 0.016) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(43, 33, 24, 0.016) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(circle at center, black, transparent 84%);
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 22%, rgba(181, 109, 74, 0.12), transparent 26%),
+    radial-gradient(circle at 78% 18%, rgba(111, 151, 136, 0.14), transparent 28%),
+    radial-gradient(circle at 52% 84%, rgba(216, 192, 170, 0.36), transparent 32%);
+  filter: blur(14px);
+  animation: ambient-drift 24s ease-in-out infinite alternate;
+}
+
+:root[data-theme='dark'] body {
+  background:
+    radial-gradient(circle at 12% 14%, rgba(242, 160, 113, 0.08) 0%, transparent 34%),
+    radial-gradient(circle at 84% 18%, rgba(142, 196, 176, 0.09) 0%, transparent 28%),
+    linear-gradient(160deg, #14110f 0%, #171412 48%, #1e1815 100%);
+}
+
+:root[data-theme='dark'] body::before {
+  background-image:
+    linear-gradient(rgba(245, 238, 231, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(245, 238, 231, 0.018) 1px, transparent 1px);
+}
+
+:root[data-theme='dark'] body::after {
+  background:
+    radial-gradient(circle at 18% 22%, rgba(242, 160, 113, 0.12), transparent 26%),
+    radial-gradient(circle at 78% 18%, rgba(142, 196, 176, 0.12), transparent 28%),
+    radial-gradient(circle at 52% 84%, rgba(68, 52, 42, 0.42), transparent 32%);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--accent), white 70%);
+  color: var(--ink);
+}
+
+@keyframes ambient-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(0, -18px, 0) scale(1.03);
+  }
 }
