@@ -3,13 +3,14 @@ import { easyQuestionBank as coreEasyQuestionBank } from './easyBank'
 import { gameEasyQuestionBank } from './gameEasyBank'
 import { gameHardQuestionBank } from './gameHardBank'
 import { hardQuestionBank as coreHardQuestionBank } from './hardBank'
-import type { Difficulty, LanguageId, LocalizedText, QuestionBankItem, QuizTrackId } from './quizModels'
+import { identifyLanguageFormat } from './quizFormats'
+import type { Difficulty, LanguageId, LocalizedText, QuestionBankItem, QuizFormatId, QuizTrackId } from './quizModels'
 
 export type { LanguageGuide, TrackSetting } from './guideData'
 
-export const QUESTIONS_PER_SESSION = 30
-export const QUESTION_TIME_LIMIT_SECONDS = 30
-
+export const QUIZ_FORMAT: QuizFormatId = identifyLanguageFormat.id
+export const QUESTIONS_PER_SESSION = identifyLanguageFormat.questionsPerSession
+export const QUESTION_TIME_LIMIT_SECONDS = identifyLanguageFormat.questionTimeLimitSeconds
 export const modeSettings: Record<
   Difficulty,
   {
@@ -18,26 +19,7 @@ export const modeSettings: Record<
     hintLimit: number
     badge: LocalizedText
   }
-> = {
-  easy: {
-    label: { th: 'โหมดง่าย', en: 'Easy mode' },
-    description: {
-      th: 'snippet สั้นกว่า มอง marker หลักให้ไว และเหมาะกับการฝึกจับกลิ่นครั้งแรก',
-      en: 'Shorter snippets that focus on the main markers and first-pass pattern recognition.',
-    },
-    hintLimit: 5,
-    badge: { th: 'Hints 5 ครั้ง', en: '5 hints' },
-  },
-  hard: {
-    label: { th: 'โหมดยาก', en: 'Hard mode' },
-    description: {
-      th: 'snippet ยาวขึ้น marker ลึกขึ้น และมีโครงสร้างที่แยกภาษาคล้ายกันได้ชัดกว่า',
-      en: 'Longer snippets with deeper markers and structures that separate lookalike options more clearly.',
-    },
-    hintLimit: 7,
-    badge: { th: 'Hints 7 ครั้ง', en: '7 hints' },
-  },
-}
+> = identifyLanguageFormat.difficulties
 
 export const questionBanks: Record<QuizTrackId, Record<Difficulty, QuestionBankItem[]>> = {
   core: {
@@ -83,6 +65,7 @@ const validateQuestionBank = (
 const coreExpectedDistribution: Record<LanguageId, number> = {
   python: 4,
   java: 4,
+  javascript: 4,
   html: 4,
   css: 4,
   json: 4,
@@ -90,6 +73,10 @@ const coreExpectedDistribution: Record<LanguageId, number> = {
   cpp: 4,
   flutter: 3,
   dart: 3,
+  go: 4,
+  kotlin: 4,
+  swift: 4,
+  ruby: 4,
   jsx: 4,
   typescript: 4,
   bash: 4,
@@ -108,11 +95,16 @@ const coreExpectedDistribution: Record<LanguageId, number> = {
   'phaser-typescript': 0,
   'rpg-maker-js': 0,
   'gamemaker-gml': 0,
+  'defold-lua': 0,
+  'cocos-typescript': 0,
+  'bevy-rust': 0,
+  'renpy-python': 0,
 }
 
 const gameExpectedDistribution: Record<LanguageId, number> = {
   python: 0,
   java: 0,
+  javascript: 0,
   html: 0,
   css: 0,
   json: 0,
@@ -120,6 +112,10 @@ const gameExpectedDistribution: Record<LanguageId, number> = {
   cpp: 0,
   flutter: 0,
   dart: 0,
+  go: 0,
+  kotlin: 0,
+  swift: 0,
+  ruby: 0,
   jsx: 0,
   typescript: 0,
   bash: 0,
@@ -138,6 +134,10 @@ const gameExpectedDistribution: Record<LanguageId, number> = {
   'phaser-typescript': 6,
   'rpg-maker-js': 6,
   'gamemaker-gml': 6,
+  'defold-lua': 5,
+  'cocos-typescript': 5,
+  'bevy-rust': 5,
+  'renpy-python': 5,
 }
 
 validateQuestionBank(coreEasyQuestionBank, coreExpectedDistribution, 'core/easy')
@@ -155,4 +155,14 @@ export {
   trackTopicIds,
 }
 
-export type { Difficulty, GuideFamilyId, LanguageId, LocalizedText, QuestionBankItem, QuizTrackId } from './quizModels'
+export type {
+  Difficulty,
+  FixErrorQuestionBankItem,
+  GuideFamilyId,
+  LanguageId,
+  LanguageIdentifyQuestionBankItem,
+  LocalizedText,
+  QuestionBankItem,
+  QuizFormatId,
+  QuizTrackId,
+} from './quizModels'

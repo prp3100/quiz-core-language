@@ -1,4 +1,5 @@
 import type { CoreLanguageId, GameLanguageId, GuideFamilyId, LanguageId, LocalizedText, QuizTrackId } from './quizModels'
+import { coreLanguageGuideExtensions, gameLanguageGuideExtensions } from './guideExtensions'
 
 export type GuidePrimerSection = {
   id: string
@@ -123,6 +124,11 @@ export const trackTopicIds: Record<QuizTrackId, LanguageId[]> = {
     'sql',
     'php',
     'rust',
+    'javascript',
+    'go',
+    'kotlin',
+    'swift',
+    'ruby',
   ],
   'game-dev': [
     'roblox-lua',
@@ -136,6 +142,10 @@ export const trackTopicIds: Record<QuizTrackId, LanguageId[]> = {
     'phaser-typescript',
     'rpg-maker-js',
     'gamemaker-gml',
+    'defold-lua',
+    'cocos-typescript',
+    'bevy-rust',
+    'renpy-python',
   ],
 }
 
@@ -146,7 +156,7 @@ export const trackSettings: Record<QuizTrackId, TrackSetting> = {
       'เส้นทางหลักสำหรับฝึกดูทรงของภาษาเว็บ แอป data backend และ system แบบที่คนเริ่มต้นก็อ่านรู้เรื่อง',
       'The main track for learning the shape of web, app, data, backend, and system languages in a beginner-friendly way.',
     ),
-    badge: t('16 หัวข้อหลัก', '16 core topics'),
+    badge: t('21 หัวข้อหลัก', '21 core topics'),
     defaultGuideId: 'python',
   },
   'game-dev': {
@@ -155,12 +165,17 @@ export const trackSettings: Record<QuizTrackId, TrackSetting> = {
       'โหมดพิเศษที่แยกกลิ่นของ engine, gameplay script, lifecycle, และ shader ออกจากกันให้เห็นชัด',
       'A special track focused on separating engine smell, gameplay scripts, lifecycle code, and shaders.',
     ),
-    badge: t('11 game stacks', '11 game stacks'),
+    badge: t('15 game stacks', '15 game stacks'),
     defaultGuideId: 'roblox-lua',
   },
 }
 
-const coreLanguageGuides: Record<CoreLanguageId, LanguageGuide> = {
+type AddedCoreLanguageId = keyof typeof coreLanguageGuideExtensions
+type AddedGameLanguageId = keyof typeof gameLanguageGuideExtensions
+type ExistingCoreLanguageId = Exclude<CoreLanguageId, AddedCoreLanguageId>
+type ExistingGameLanguageId = Exclude<GameLanguageId, AddedGameLanguageId>
+
+const coreLanguageGuides: Record<ExistingCoreLanguageId, LanguageGuide> = {
   python: {
     track: 'core',
     label: t('Python', 'Python'),
@@ -675,7 +690,7 @@ const coreLanguageGuides: Record<CoreLanguageId, LanguageGuide> = {
   },
 }
 
-const gameLanguageGuides: Record<GameLanguageId, LanguageGuide> = {
+const gameLanguageGuides: Record<ExistingGameLanguageId, LanguageGuide> = {
   'roblox-lua': {
     track: 'game-dev',
     label: t('Roblox Lua', 'Roblox Lua'),
@@ -1035,7 +1050,9 @@ const gameLanguageGuides: Record<GameLanguageId, LanguageGuide> = {
 
 export const languageGuides: Record<LanguageId, LanguageGuide> = {
   ...coreLanguageGuides,
+  ...coreLanguageGuideExtensions,
   ...gameLanguageGuides,
+  ...gameLanguageGuideExtensions,
 }
 
 export const guideBookEntries = languageGuides

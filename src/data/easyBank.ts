@@ -1,4 +1,5 @@
 import { createQuestionSet, type QuestionBankItem } from './quizModels'
+import { coreEasyQuestionBankExtensions } from './coreEasyExtensions'
 
 export const easyQuestionBank: QuestionBankItem[] = [
   ...createQuestionSet('easy', 'python', [
@@ -764,4 +765,5 @@ impl User {
       signals: ['match', 'Some/None', '=>', 'println!'],
     },
   ]),
+  ...coreEasyQuestionBankExtensions,
 ]
