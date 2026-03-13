@@ -18,13 +18,10 @@ import {
   Sparkles,
   SunMedium,
   Trophy,
-  Volume2,
   WandSparkles,
   XCircle,
 } from 'lucide-react'
 import {
-  QUESTIONS_PER_SESSION,
-  QUESTION_TIME_LIMIT_SECONDS,
   guideBookEntries,
   guideFamilyLabels,
   guidePrimerSections,
@@ -37,13 +34,24 @@ import {
   type LanguageId,
   type QuizTrackId,
 } from './data/questionBank'
+import {
+  FIX_ERROR_ALL_CORE_SCOPE,
+  fixErrorSupportedLanguageIds,
+  type FixErrorScopeId,
+  type FixErrorSupportedLanguageId,
+} from './data/fixErrorData'
+import { fixErrorFormat, identifyLanguageFormat, quizFormatSettings } from './data/quizFormats'
+import type { FixErrorChoice, QuizFormatId } from './data/quizModels'
 import { LOCALE_STORAGE_KEY, getInitialLocale, getLanguageLabel, uiText, type Locale } from './lib/i18n'
 import { useQuizAudio } from './lib/audio'
 import { SyntaxSnippet } from './components/SyntaxSnippet'
 import {
-  createQuizSession,
+  createFixErrorSession,
+  createIdentifyLanguageSession,
   getOutcomeBreakdown,
   getRatingBand,
+  type FixErrorQuizQuestion,
+  type IdentifyLanguageQuizQuestion,
   type QuestionOutcome,
   type QuizQuestion,
 } from './lib/quiz'
@@ -63,7 +71,9 @@ const QuizStatsCharts = lazy(async () => {
 })
 
 const TRACK_STORAGE_KEY = 'code-language-quiz:track'
+const QUIZ_FORMAT_STORAGE_KEY = 'code-language-quiz:format'
 const DIFFICULTY_STORAGE_KEY = 'code-language-quiz:difficulty'
+const FIX_ERROR_SCOPE_STORAGE_KEY = 'code-language-quiz:fix-error-scope'
 const VIEWED_GUIDES_STORAGE_KEY = 'code-language-quiz:viewed-guides'
 const THEME_STORAGE_KEY = 'code-language-quiz:theme'
 
@@ -111,6 +121,65 @@ const formatTime = (value: number) => `00:${String(value).padStart(2, '0')}`
 
 const formatSignals = (signals: string[]) => signals.map((signal) => `\`${signal}\``).join(', ')
 
+const fixErrorSupportedLanguageSet = new Set<FixErrorSupportedLanguageId>(fixErrorSupportedLanguageIds)
+
+const extraCopy = {
+  th: {
+    formatLabel: 'Quiz Format',
+    profileLabel: 'Profile',
+    scopeLabel: 'Language Scope',
+    allCoreLabel: 'All Core',
+    identifyFormatSummary: '30 ข้อ / Easy-Hard',
+    standardSummary: 'Standard / 15 ข้อ / 3 hints',
+    fixedCoreNote: 'Fix Error เล่นได้เฉพาะ core track',
+    fixErrorRules: [
+      'Fix Error เป็น standard mode อย่างเดียว 15 ข้อ และให้เวลา 35 วินาทีต่อข้อ',
+      'มี hint รวม 3 ครั้งต่อรอบ และใช้ได้เฉพาะ core ที่รองรับใน phase นี้',
+      'เลือกได้ว่าจะสุ่มจาก All Core หรือเจาะภาษาเดียว',
+      'คำถามจะให้ดู snippet ก่อน แล้ววาง error ไว้ด้านล่างเพื่อระบุ line ที่น่าจะเป็นต้นเหตุหลัก',
+    ],
+    tryFixError: 'Try Fix Error',
+    fixErrorQuestionLabel: 'โจทย์',
+    fixErrorQuestionHint: 'อ่าน flow ของ snippet นี้ก่อน แล้วค่อยใช้ error ด้านล่างเพื่อชี้ว่าบรรทัดไหนคือต้นเหตุหลัก',
+    errorTextLabel: 'Error',
+    culpritLabel: 'จุดที่น่าจะพัง',
+    correctLineLabel: 'Culprit line',
+    choiceWhyLabel: 'Why each line is or is not the culprit',
+    allCoreDescription: 'สุ่มข้ามภาษา core ที่รองรับทั้งหมด',
+    singleCoreDescription: 'เจาะ language เดียวเพื่อซ้อมแก้จุดพัง',
+    scopeNote: 'phase แรกยังไม่รวม html, css, json และ flutter',
+    fixErrorBadge: 'Core only',
+    fixErrorResultNote: 'สรุปโหมด Fix Error จะวัดหัวข้ออ่อนตามภาษา ไม่ใช่ตาม choice line',
+  },
+  en: {
+    formatLabel: 'Quiz Format',
+    profileLabel: 'Profile',
+    scopeLabel: 'Language Scope',
+    allCoreLabel: 'All Core',
+    identifyFormatSummary: '30 questions / Easy-Hard',
+    standardSummary: 'Standard / 15 questions / 3 hints',
+    fixedCoreNote: 'Fix Error is available on the core track only',
+    fixErrorRules: [
+      'Fix Error uses a single standard profile: 15 questions and 35 seconds per question.',
+      'The round has 3 shared hints and only uses the supported core subset in this phase.',
+      'You can shuffle across All Core or drill into a single language.',
+      'Each question shows the snippet first, then places the error underneath before you choose the culprit line.',
+    ],
+    tryFixError: 'Try Fix Error',
+    fixErrorQuestionLabel: 'Question',
+    fixErrorQuestionHint: 'Read this snippet as the failing scenario first, then use the error underneath to pinpoint the culprit line.',
+    errorTextLabel: 'Error',
+    culpritLabel: 'Possible culprit',
+    correctLineLabel: 'Culprit line',
+    choiceWhyLabel: 'Why each line is or is not the culprit',
+    allCoreDescription: 'Shuffle across every supported core language',
+    singleCoreDescription: 'Drill one language at a time',
+    scopeNote: 'Phase 1 excludes html, css, json, and flutter.',
+    fixErrorBadge: 'Core only',
+    fixErrorResultNote: 'Fix Error summary tracks weak spots by language, not by line choice.',
+  },
+} as const
+
 const persistStorage = (key: string, value: string) => {
   if (typeof window === 'undefined') {
     return
@@ -132,6 +201,15 @@ const getInitialTrack = (): QuizTrackId => {
   return storedValue === 'core' || storedValue === 'game-dev' ? storedValue : 'core'
 }
 
+const getInitialQuizFormat = (): QuizFormatId => {
+  if (typeof window === 'undefined') {
+    return 'identify-language'
+  }
+
+  const storedValue = window.localStorage.getItem(QUIZ_FORMAT_STORAGE_KEY)
+  return storedValue === 'identify-language' || storedValue === 'fix-error' ? storedValue : 'identify-language'
+}
+
 const getInitialDifficulty = (): Difficulty => {
   if (typeof window === 'undefined') {
     return 'easy'
@@ -139,6 +217,22 @@ const getInitialDifficulty = (): Difficulty => {
 
   const storedValue = window.localStorage.getItem(DIFFICULTY_STORAGE_KEY)
   return storedValue === 'easy' || storedValue === 'hard' ? storedValue : 'easy'
+}
+
+const getInitialFixErrorScope = (): FixErrorScopeId => {
+  if (typeof window === 'undefined') {
+    return FIX_ERROR_ALL_CORE_SCOPE
+  }
+
+  const storedValue = window.localStorage.getItem(FIX_ERROR_SCOPE_STORAGE_KEY)
+
+  if (storedValue === FIX_ERROR_ALL_CORE_SCOPE) {
+    return storedValue
+  }
+
+  return fixErrorSupportedLanguageSet.has(storedValue as FixErrorSupportedLanguageId)
+    ? (storedValue as FixErrorSupportedLanguageId)
+    : FIX_ERROR_ALL_CORE_SCOPE
 }
 
 const getInitialViewedGuideIds = (): LanguageId[] => {
@@ -178,6 +272,10 @@ const getInitialTheme = (): ThemeMode => {
 }
 
 const buildCorrectSummary = (locale: Locale, question: QuizQuestion) => {
+  if (question.format !== 'identify-language') {
+    return question.explanation.correct[locale]
+  }
+
   const guide = guideBookEntries[question.answer]
   const signals = formatSignals(question.signals)
 
@@ -186,16 +284,26 @@ const buildCorrectSummary = (locale: Locale, question: QuizQuestion) => {
     : `This is ${guide.label.en} because the snippet shows ${signals}, which matches the strongest markers for this topic. ${guide.plainSummary.en} A quick memory hook is: “${guide.quickSpot.en}”.`
 }
 
+const isIdentifyLanguageQuestion = (question: QuizQuestion | null): question is IdentifyLanguageQuizQuestion =>
+  question?.format === 'identify-language'
+
+const isFixErrorQuestion = (question: QuizQuestion | null): question is FixErrorQuizQuestion => question?.format === 'fix-error'
+
+const isFixErrorSupportedLanguage = (topicId: LanguageId): topicId is FixErrorSupportedLanguageId =>
+  fixErrorSupportedLanguageSet.has(topicId as FixErrorSupportedLanguageId)
+
 function App() {
   const [locale, setLocale] = useState<Locale>(getInitialLocale)
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme)
-  const [track, setTrack] = useState<QuizTrackId>(getInitialTrack)
+  const [quizFormat, setQuizFormat] = useState<QuizFormatId>(getInitialQuizFormat)
+  const [track, setTrack] = useState<QuizTrackId>(() => (getInitialQuizFormat() === 'fix-error' ? 'core' : getInitialTrack()))
   const [difficulty, setDifficulty] = useState<Difficulty>(getInitialDifficulty)
+  const [fixErrorScope, setFixErrorScope] = useState<FixErrorScopeId>(getInitialFixErrorScope)
   const [view, setView] = useState<AppView>('menu')
   const [quizPhase, setQuizPhase] = useState<QuizPhase>('active')
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [timeLeft, setTimeLeft] = useState(QUESTION_TIME_LIMIT_SECONDS)
+  const [timeLeft, setTimeLeft] = useState(identifyLanguageFormat.questionTimeLimitSeconds)
   const [outcomes, setOutcomes] = useState<QuestionOutcome[]>([])
   const [currentOutcome, setCurrentOutcome] = useState<QuestionOutcome | null>(null)
   const [hintedQuestionIds, setHintedQuestionIds] = useState<string[]>([])
@@ -206,17 +314,22 @@ function App() {
   const audio = useQuizAudio()
 
   const copy = uiText[locale]
-  const mode = modeSettings[difficulty]
-  const currentTrack = trackSettings[track]
+  const formatCopy = extraCopy[locale]
+  const formatConfig = quizFormatSettings[quizFormat]
+  const isFixErrorMode = quizFormat === 'fix-error'
+  const activeTrack = isFixErrorMode ? 'core' : track
+  const mode = isFixErrorMode ? fixErrorFormat.standard : modeSettings[difficulty]
+  const currentTrack = trackSettings[activeTrack]
   const currentQuestion = questions[currentIndex] ?? null
   const hintsRemaining = Math.max(0, mode.hintLimit - hintedQuestionIds.length)
   const currentQuestionHintVisible = currentQuestion ? hintedQuestionIds.includes(currentQuestion.id) : false
   const score = outcomes.filter((outcome) => outcome.isCorrect).length
   const breakdown = getOutcomeBreakdown(outcomes)
-  const rating = getRatingBand(score)
+  const totalQuestions = questions.length || formatConfig.questionsPerSession
+  const rating = getRatingBand(score, totalQuestions)
   const isLastQuestion = currentIndex === questions.length - 1
-  const timerProgress = `${(timeLeft / QUESTION_TIME_LIMIT_SECONDS) * 100}%`
-  const trackTopicList = trackTopicIds[track]
+  const timerProgress = `${(timeLeft / formatConfig.questionTimeLimitSeconds) * 100}%`
+  const trackTopicList = trackTopicIds[activeTrack]
   const familyOptions = [...new Set(trackTopicList.map((topicId) => guideBookEntries[topicId].family))] as GuideFamilyId[]
   const filteredGuideIds =
     familyFilter === 'all'
@@ -224,10 +337,24 @@ function App() {
       : trackTopicList.filter((topicId) => guideBookEntries[topicId].family === familyFilter)
   const trackViewedCount = trackTopicList.filter((topicId) => viewedGuideIds.includes(topicId)).length
   const screenView: AppView = view === 'quiz' && !currentQuestion ? 'menu' : view
+  const currentFormatLabel = formatConfig.label[locale]
+  const currentModeLabel = mode.label[locale]
+  const currentModeBadge = mode.badge[locale]
+  const currentScopeLabel =
+    fixErrorScope === FIX_ERROR_ALL_CORE_SCOPE ? formatCopy.allCoreLabel : getLanguageLabel(locale, fixErrorScope)
+  const activeIntroRules = isFixErrorMode ? formatCopy.fixErrorRules : copy.introRules
+  const currentQuestionLabel =
+    currentQuestion && isFixErrorQuestion(currentQuestion) ? formatCopy.fixErrorQuestionLabel : copy.snippetLabel
+  const currentQuestionHint =
+    currentQuestion && isFixErrorQuestion(currentQuestion) ? formatCopy.fixErrorQuestionHint : copy.snippetHint
 
   useEffect(() => {
     persistStorage(LOCALE_STORAGE_KEY, locale)
   }, [locale])
+
+  useEffect(() => {
+    persistStorage(QUIZ_FORMAT_STORAGE_KEY, quizFormat)
+  }, [quizFormat])
 
   useEffect(() => {
     persistStorage(THEME_STORAGE_KEY, theme)
@@ -242,6 +369,10 @@ function App() {
   useEffect(() => {
     persistStorage(DIFFICULTY_STORAGE_KEY, difficulty)
   }, [difficulty])
+
+  useEffect(() => {
+    persistStorage(FIX_ERROR_SCOPE_STORAGE_KEY, fixErrorScope)
+  }, [fixErrorScope])
 
   useEffect(() => {
     persistStorage(VIEWED_GUIDES_STORAGE_KEY, JSON.stringify(viewedGuideIds))
@@ -266,16 +397,30 @@ function App() {
       return
     }
 
-    const nextOutcome: QuestionOutcome = {
-      questionId: question.id,
-      answer: question.answer,
-      selectedChoice: null,
-      isCorrect: false,
-      result: 'timeout',
-      hintUsed: hintedQuestionIds.includes(question.id),
-      difficulty,
-      track,
-    }
+    const nextOutcome: QuestionOutcome =
+      question.format === 'identify-language'
+        ? {
+            questionId: question.id,
+            format: question.format,
+            answer: question.answer,
+            selectedChoice: null,
+            isCorrect: false,
+            result: 'timeout',
+            hintUsed: hintedQuestionIds.includes(question.id),
+            difficulty,
+            track: activeTrack,
+          }
+        : {
+            questionId: question.id,
+            format: question.format,
+            language: question.language,
+            answer: question.answer,
+            selectedChoice: null,
+            isCorrect: false,
+            result: 'timeout',
+            hintUsed: hintedQuestionIds.includes(question.id),
+            track: 'core',
+          }
 
     setCurrentOutcome(nextOutcome)
     setOutcomes((current) => [...current, nextOutcome])
@@ -301,32 +446,49 @@ function App() {
   }
 
   const startNewQuiz = ({
-    nextTrack = track,
+    nextFormat = quizFormat,
+    nextTrack = activeTrack,
     nextDifficulty = difficulty,
+    nextFixErrorScope = fixErrorScope,
     priorityTopics,
     priorityTopicLimit = 6,
   }: {
+    nextFormat?: QuizFormatId
     nextTrack?: QuizTrackId
     nextDifficulty?: Difficulty
+    nextFixErrorScope?: FixErrorScopeId
     priorityTopics?: LanguageId[]
     priorityTopicLimit?: number
   } = {}) => {
-    const nextQuestions = createQuizSession(questionBanks[nextTrack][nextDifficulty], QUESTIONS_PER_SESSION, {
-      priorityTopics,
-      priorityTopicLimit,
-    })
+    const nextQuestions =
+      nextFormat === 'identify-language'
+        ? createIdentifyLanguageSession(questionBanks[nextTrack][nextDifficulty], identifyLanguageFormat.questionsPerSession, {
+            priorityTopics,
+            priorityTopicLimit,
+          })
+        : createFixErrorSession(nextFixErrorScope, fixErrorFormat.questionsPerSession)
 
     audio.playTap()
 
     startTransition(() => {
-      if (nextTrack !== track) {
+      if (nextFormat === 'fix-error') {
+        if (track !== 'core') {
+          applyTrackSelection('core')
+        }
+      } else if (nextTrack !== activeTrack) {
         applyTrackSelection(nextTrack)
       }
 
+      setQuizFormat(nextFormat)
       setDifficulty(nextDifficulty)
+      setFixErrorScope(nextFixErrorScope)
       setQuestions(nextQuestions)
       setCurrentIndex(0)
-      setTimeLeft(QUESTION_TIME_LIMIT_SECONDS)
+      setTimeLeft(
+        nextFormat === 'identify-language'
+          ? identifyLanguageFormat.questionTimeLimitSeconds
+          : fixErrorFormat.questionTimeLimitSeconds,
+      )
       setOutcomes([])
       setCurrentOutcome(null)
       setHintedQuestionIds([])
@@ -340,29 +502,54 @@ function App() {
     markGuideViewed(topicId)
 
     startNewQuiz({
+      nextFormat: 'identify-language',
       nextTrack: guide.track,
       priorityTopics: [topicId, ...guide.falseFriends],
       priorityTopicLimit: 8,
     })
   }
 
-  const revealFeedback = (choice: LanguageId | null, result: QuestionOutcome['result']) => {
+  const startFixErrorTopicQuiz = (topicId: FixErrorSupportedLanguageId) => {
+    markGuideViewed(topicId)
+
+    startNewQuiz({
+      nextFormat: 'fix-error',
+      nextTrack: 'core',
+      nextFixErrorScope: topicId,
+    })
+  }
+
+  const revealFeedback = (choice: string | null, result: QuestionOutcome['result']) => {
     const question = questions[currentIndex]
 
     if (!question) {
       return
     }
 
-    const nextOutcome: QuestionOutcome = {
-      questionId: question.id,
-      answer: question.answer,
-      selectedChoice: choice,
-      isCorrect: result === 'correct',
-      result,
-      hintUsed: hintedQuestionIds.includes(question.id),
-      difficulty,
-      track,
-    }
+    const nextOutcome: QuestionOutcome =
+      question.format === 'identify-language'
+        ? {
+            questionId: question.id,
+            format: question.format,
+            answer: question.answer,
+            selectedChoice: choice as LanguageId | null,
+            isCorrect: result === 'correct',
+            result,
+            hintUsed: hintedQuestionIds.includes(question.id),
+            difficulty,
+            track: activeTrack,
+          }
+        : {
+            questionId: question.id,
+            format: question.format,
+            language: question.language,
+            answer: question.answer,
+            selectedChoice: choice,
+            isCorrect: result === 'correct',
+            result,
+            hintUsed: hintedQuestionIds.includes(question.id),
+            track: 'core',
+          }
 
     if (result === 'correct') {
       audio.playSuccess()
@@ -375,7 +562,7 @@ function App() {
     setQuizPhase('feedback')
   }
 
-  const handleChoice = (choice: LanguageId) => {
+  const handleChoice = (choice: LanguageId | string) => {
     if (!currentQuestion || view !== 'quiz' || quizPhase !== 'active') {
       return
     }
@@ -402,8 +589,17 @@ function App() {
 
     setCurrentIndex((index) => index + 1)
     setCurrentOutcome(null)
-    setTimeLeft(QUESTION_TIME_LIMIT_SECONDS)
+    setTimeLeft(formatConfig.questionTimeLimitSeconds)
     setQuizPhase('active')
+  }
+
+  const handleFormatChange = (nextFormat: QuizFormatId) => {
+    audio.playTap()
+    setQuizFormat(nextFormat)
+
+    if (nextFormat === 'fix-error') {
+      applyTrackSelection('core')
+    }
   }
 
   const handleTrackChange = (nextTrack: QuizTrackId) => {
@@ -416,10 +612,15 @@ function App() {
     setDifficulty(nextDifficulty)
   }
 
-  const handleOpenGuide = (nextTrack = track) => {
+  const handleFixErrorScopeChange = (nextScope: FixErrorScopeId) => {
+    audio.playTap()
+    setFixErrorScope(nextScope)
+  }
+
+  const handleOpenGuide = (nextTrack = activeTrack) => {
     audio.playTap()
 
-    if (nextTrack !== track) {
+    if (nextTrack !== activeTrack) {
       applyTrackSelection(nextTrack)
     }
 
@@ -461,59 +662,18 @@ function App() {
     setTheme((current) => (current === 'light' ? 'dark' : 'light'))
   }
 
-  const renderTrackPicker = () => (
+  const renderFormatPicker = () => (
     <div className="grid gap-4 md:grid-cols-2">
-      {(['core', 'game-dev'] as const).map((topicTrack) => {
-        const config = trackSettings[topicTrack]
-        const Icon = trackIcons[topicTrack]
-        const isActive = topicTrack === track
-        const viewed = trackTopicIds[topicTrack].filter((topicId) => viewedGuideIds.includes(topicId)).length
-
-        return (
-          <button
-            key={topicTrack}
-            type="button"
-            onClick={() => handleTrackChange(topicTrack)}
-            className={clsx(
-              'group rounded-[28px] border p-5 text-left transition duration-300',
-              isActive
-                ? 'border-[var(--line-strong)] bg-[var(--surface-strong)] shadow-[0_24px_44px_rgba(100,84,64,0.12)]'
-                : `${softSurfaceClass} hover:-translate-y-1 ${hoverSurfaceClass}`,
-            )}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div className="rounded-2xl bg-[var(--surface-strong)] p-3 text-[var(--ink)] shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]">
-                <Icon size={18} />
-              </div>
-              <span className="rounded-full border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-1 text-xs font-semibold text-[var(--muted)]">
-                {config.badge[locale]}
-              </span>
-            </div>
-            <p className="mt-4 text-lg font-semibold text-[var(--ink)]">{config.label[locale]}</p>
-            <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{config.description[locale]}</p>
-            <div className="mt-4 flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
-              <span>
-                {copy.viewedGuides}: {viewed}/{trackTopicIds[topicTrack].length}
-              </span>
-              <span className="transition group-hover:translate-x-0.5">{modeSettings[difficulty].badge[locale]}</span>
-            </div>
-          </button>
-        )
-      })}
-    </div>
-  )
-
-  const renderDifficultyPicker = () => (
-    <div className="grid gap-4 md:grid-cols-2">
-      {(['easy', 'hard'] as const).map((value) => {
-        const config = modeSettings[value]
-        const isActive = difficulty === value
+      {(['identify-language', 'fix-error'] as const).map((value) => {
+        const config = quizFormatSettings[value]
+        const isActive = quizFormat === value
+        const badge = value === 'identify-language' ? formatCopy.identifyFormatSummary : formatCopy.standardSummary
 
         return (
           <button
             key={value}
             type="button"
-            onClick={() => handleDifficultyChange(value)}
+            onClick={() => handleFormatChange(value)}
             className={clsx(
               'rounded-[28px] border p-5 text-left transition duration-300',
               isActive
@@ -524,7 +684,7 @@ function App() {
             <div className="flex items-center justify-between gap-3">
               <p className="text-lg font-semibold text-[var(--ink)]">{config.label[locale]}</p>
               <span className="rounded-full border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-1 text-xs font-semibold text-[var(--muted)]">
-                {config.badge[locale]}
+                {badge}
               </span>
             </div>
             <p className="mt-3 text-sm leading-7 text-[var(--muted)]">{config.description[locale]}</p>
@@ -534,22 +694,162 @@ function App() {
     </div>
   )
 
+  const renderTrackPicker = () => (
+    isFixErrorMode ? (
+      <div className="rounded-[28px] border border-[var(--line-strong)] bg-[var(--surface-strong)] p-5 shadow-[0_24px_44px_rgba(100,84,64,0.12)]">
+        <div className="flex items-start justify-between gap-4">
+          <div className="rounded-2xl bg-[var(--surface-raised)] p-3 text-[var(--ink)] shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]">
+            <BookOpen size={18} />
+          </div>
+          <span className="rounded-full border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-1 text-xs font-semibold text-[var(--muted)]">
+            {formatCopy.fixErrorBadge}
+          </span>
+        </div>
+        <p className="mt-4 text-lg font-semibold text-[var(--ink)]">{trackSettings.core.label[locale]}</p>
+        <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{formatCopy.fixedCoreNote}</p>
+      </div>
+    ) : (
+      <div className="grid gap-4 md:grid-cols-2">
+        {(['core', 'game-dev'] as const).map((topicTrack) => {
+          const config = trackSettings[topicTrack]
+          const Icon = trackIcons[topicTrack]
+          const isActive = topicTrack === activeTrack
+          const viewed = trackTopicIds[topicTrack].filter((topicId) => viewedGuideIds.includes(topicId)).length
+
+          return (
+            <button
+              key={topicTrack}
+              type="button"
+              onClick={() => handleTrackChange(topicTrack)}
+              className={clsx(
+                'group rounded-[28px] border p-5 text-left transition duration-300',
+                isActive
+                  ? 'border-[var(--line-strong)] bg-[var(--surface-strong)] shadow-[0_24px_44px_rgba(100,84,64,0.12)]'
+                  : `${softSurfaceClass} hover:-translate-y-1 ${hoverSurfaceClass}`,
+              )}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="rounded-2xl bg-[var(--surface-strong)] p-3 text-[var(--ink)] shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]">
+                  <Icon size={18} />
+                </div>
+                <span className="rounded-full border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-1 text-xs font-semibold text-[var(--muted)]">
+                  {config.badge[locale]}
+                </span>
+              </div>
+              <p className="mt-4 text-lg font-semibold text-[var(--ink)]">{config.label[locale]}</p>
+              <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{config.description[locale]}</p>
+              <div className="mt-4 flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                <span>
+                  {copy.viewedGuides}: {viewed}/{trackTopicIds[topicTrack].length}
+                </span>
+                <span className="transition group-hover:translate-x-0.5">{currentModeBadge}</span>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    )
+  )
+
+  const renderModePicker = () =>
+    isFixErrorMode ? (
+      <div className="rounded-[28px] border border-[var(--line-strong)] bg-[var(--surface-strong)] p-5 shadow-[0_24px_44px_rgba(100,84,64,0.12)]">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-lg font-semibold text-[var(--ink)]">{fixErrorFormat.standard.label[locale]}</p>
+          <span className="rounded-full border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-1 text-xs font-semibold text-[var(--muted)]">
+            {fixErrorFormat.standard.badge[locale]}
+          </span>
+        </div>
+        <p className="mt-3 text-sm leading-7 text-[var(--muted)]">{fixErrorFormat.standard.description[locale]}</p>
+      </div>
+    ) : (
+      <div className="grid gap-4 md:grid-cols-2">
+        {(['easy', 'hard'] as const).map((value) => {
+          const config = modeSettings[value]
+          const isActive = difficulty === value
+
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => handleDifficultyChange(value)}
+              className={clsx(
+                'rounded-[28px] border p-5 text-left transition duration-300',
+                isActive
+                  ? 'border-[var(--line-strong)] bg-[var(--surface-strong)] shadow-[0_24px_44px_rgba(100,84,64,0.12)]'
+                  : `${softSurfaceClass} hover:-translate-y-1 ${hoverSurfaceClass}`,
+              )}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-lg font-semibold text-[var(--ink)]">{config.label[locale]}</p>
+                <span className="rounded-full border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-1 text-xs font-semibold text-[var(--muted)]">
+                  {config.badge[locale]}
+                </span>
+              </div>
+              <p className="mt-3 text-sm leading-7 text-[var(--muted)]">{config.description[locale]}</p>
+            </button>
+          )
+        })}
+      </div>
+    )
+
+  const renderFixErrorScopePicker = () =>
+    isFixErrorMode ? (
+      <div className="space-y-4">
+        <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface-raised)] p-4">
+          <p className="text-sm text-[var(--ink)]">{formatCopy.scopeNote}</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <button
+            type="button"
+            onClick={() => handleFixErrorScopeChange(FIX_ERROR_ALL_CORE_SCOPE)}
+            className={clsx(
+              'rounded-[24px] border p-4 text-left transition duration-300',
+              fixErrorScope === FIX_ERROR_ALL_CORE_SCOPE
+                ? 'border-[var(--line-strong)] bg-[var(--surface-strong)] shadow-[0_18px_36px_rgba(100,84,64,0.12)]'
+                : `${softSurfaceClass} hover:-translate-y-0.5 ${hoverSurfaceClass}`,
+            )}
+          >
+            <p className="text-sm font-semibold text-[var(--ink)]">{formatCopy.allCoreLabel}</p>
+            <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{formatCopy.allCoreDescription}</p>
+          </button>
+
+          {fixErrorSupportedLanguageIds.map((languageId) => (
+            <button
+              key={languageId}
+              type="button"
+              onClick={() => handleFixErrorScopeChange(languageId)}
+              className={clsx(
+                'rounded-[24px] border p-4 text-left transition duration-300',
+                fixErrorScope === languageId
+                  ? 'border-[var(--line-strong)] bg-[var(--surface-strong)] shadow-[0_18px_36px_rgba(100,84,64,0.12)]'
+                  : `${softSurfaceClass} hover:-translate-y-0.5 ${hoverSurfaceClass}`,
+              )}
+            >
+              <p className="text-sm font-semibold text-[var(--ink)]">{getLanguageLabel(locale, languageId)}</p>
+              <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{formatCopy.singleCoreDescription}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+    ) : null
+
   const renderMenu = () => {
     const menuStats = [
       {
         label: copy.trackLabel,
         value: currentTrack.label[locale],
-        Icon: trackIcons[track],
+        Icon: trackIcons[activeTrack],
       },
       {
-        label: copy.modeLabel,
-        value: mode.label[locale],
+        label: formatCopy.formatLabel,
+        value: currentFormatLabel,
         Icon: WandSparkles,
       },
       {
-        label: copy.soundLabel,
-        value: copy.soundEnabled,
-        Icon: Volume2,
+        label: isFixErrorMode ? formatCopy.scopeLabel : formatCopy.profileLabel,
+        value: isFixErrorMode ? currentScopeLabel : currentModeLabel,
+        Icon: Sparkles,
       },
       {
         label: copy.guideProgress,
@@ -567,7 +867,7 @@ function App() {
           </div>
 
           <div className="mt-6 flex flex-wrap gap-2">
-            {copy.introRules.map((rule) => (
+            {activeIntroRules.map((rule) => (
               <span key={rule} className="rounded-full border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-1 text-xs text-[var(--muted)]">
                 {rule}
               </span>
@@ -602,14 +902,26 @@ function App() {
           </div>
 
           <div className="mt-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">{formatCopy.formatLabel}</p>
+            <div className="mt-4">{renderFormatPicker()}</div>
+          </div>
+
+          <div className="mt-8">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">{copy.trackLabel}</p>
             <div className="mt-4">{renderTrackPicker()}</div>
           </div>
 
           <div className="mt-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">{copy.modeLabel}</p>
-            <div className="mt-4">{renderDifficultyPicker()}</div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">{formatCopy.profileLabel}</p>
+            <div className="mt-4">{renderModePicker()}</div>
           </div>
+
+          {isFixErrorMode && (
+            <div className="mt-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">{formatCopy.scopeLabel}</p>
+              <div className="mt-4">{renderFixErrorScopePicker()}</div>
+            </div>
+          )}
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <button
@@ -639,14 +951,14 @@ function App() {
                 <p className="mt-1 text-sm text-[var(--ink)]">{copy.readyDescription}</p>
               </div>
               <span className="rounded-full border border-[var(--line)] bg-[var(--surface-strong)]/85 px-3 py-1 text-xs font-semibold text-[var(--muted)]">
-                {mode.badge[locale]}
+                {currentModeBadge}
               </span>
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
               {[
                 { label: copy.trackLabel, value: currentTrack.label[locale], Icon: BookOpen },
-                { label: copy.timeLeft, value: `${QUESTION_TIME_LIMIT_SECONDS}s`, Icon: Clock3 },
+                { label: copy.timeLeft, value: `${formatConfig.questionTimeLimitSeconds}s`, Icon: Clock3 },
                 { label: copy.guideProgress, value: `${trackViewedCount}/${trackTopicList.length}`, Icon: Sparkles },
               ].map(({ label, value, Icon }) => (
                 <div key={label} className="rounded-[24px] border border-[var(--line)] bg-[var(--surface-strong)]/78 p-4">
@@ -664,7 +976,7 @@ function App() {
             <div className="mt-5 rounded-[26px] border border-[var(--line)] bg-[linear-gradient(135deg,rgba(120,144,132,0.08),rgba(198,165,134,0.12))] p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{copy.quizTitle}</p>
               <div className="mt-4 space-y-3">
-                {copy.introRules.slice(0, 3).map((rule) => (
+                {activeIntroRules.slice(0, 3).map((rule) => (
                   <div key={rule} className="flex items-start gap-3 rounded-2xl bg-[var(--surface-strong)]/72 px-4 py-3">
                     <ArrowRight size={16} className="mt-0.5 shrink-0 text-[var(--accent)]" />
                     <p className="text-sm leading-7 text-[var(--ink)]">{rule}</p>
@@ -732,7 +1044,7 @@ function App() {
             className="inline-flex items-center justify-center gap-2 rounded-[22px] bg-[var(--ink)] px-5 py-3 text-sm font-semibold text-[var(--surface-strong)] transition hover:-translate-y-0.5"
           >
             <Play size={16} />
-            {copy.startTrackQuiz}
+            {isFixErrorMode ? formatCopy.tryFixError : copy.startTrackQuiz}
           </button>
         </div>
       </div>
@@ -771,11 +1083,11 @@ function App() {
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
               <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface-strong)]/78 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{copy.totalCount}</p>
-                <p className="mt-2 text-2xl font-semibold text-[var(--ink)]">{QUESTIONS_PER_SESSION}</p>
+                <p className="mt-2 text-2xl font-semibold text-[var(--ink)]">{formatConfig.questionsPerSession}</p>
               </div>
               <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface-strong)]/78 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{copy.timeLeft}</p>
-                <p className="mt-2 text-2xl font-semibold text-[var(--ink)]">{QUESTION_TIME_LIMIT_SECONDS}s</p>
+                <p className="mt-2 text-2xl font-semibold text-[var(--ink)]">{formatConfig.questionTimeLimitSeconds}s</p>
               </div>
             </div>
           </div>
@@ -922,6 +1234,16 @@ function App() {
                       <Play size={15} />
                       {copy.tryThisTopic}
                     </button>
+                    {guide.track === 'core' && isFixErrorSupportedLanguage(topicId) && (
+                      <button
+                        type="button"
+                        onClick={() => startFixErrorTopicQuiz(topicId)}
+                        className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface-soft)] px-4 py-2 text-sm font-semibold text-[var(--ink)] transition hover:-translate-y-0.5 hover:bg-[var(--surface-hover)]"
+                      >
+                        <WandSparkles size={15} />
+                        {formatCopy.tryFixError}
+                      </button>
+                    )}
                     {compareTarget && (
                       <button
                         type="button"
@@ -934,7 +1256,11 @@ function App() {
                     )}
                   </div>
 
-                  <p className="mt-3 text-xs text-[var(--muted)]">{copy.focusDrillNote}</p>
+                  <p className="mt-3 text-xs text-[var(--muted)]">
+                    {guide.track === 'core' && isFixErrorSupportedLanguage(topicId) && isFixErrorMode
+                      ? formatCopy.scopeNote
+                      : copy.focusDrillNote}
+                  </p>
 
                   {isExpanded && (
                     <div className="mt-5 space-y-4">
@@ -1002,21 +1328,22 @@ function App() {
     </motion.section>
   )
 
-  const renderChoiceCard = (choice: LanguageId, index: number) => {
+  const renderChoiceCard = (choice: LanguageId | FixErrorChoice, index: number) => {
     if (!currentQuestion) {
       return null
     }
 
     const isLocked = quizPhase === 'feedback'
-    const isCorrect = currentQuestion.answer === choice
-    const isSelected = currentOutcome?.selectedChoice === choice
+    const choiceId = typeof choice === 'string' ? choice : choice.id
+    const isCorrect = currentQuestion.answer === choiceId
+    const isSelected = currentOutcome?.selectedChoice === choiceId
 
     return (
       <button
-        key={choice}
+        key={choiceId}
         type="button"
         disabled={isLocked}
-        onClick={() => handleChoice(choice)}
+        onClick={() => handleChoice(choiceId)}
         className={clsx(
           'group rounded-[28px] border p-4 text-left transition duration-300',
           isLocked ? 'cursor-default' : 'hover:-translate-y-1 hover:bg-[var(--surface-hover)]',
@@ -1041,13 +1368,27 @@ function App() {
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-[var(--ink)]">{getLanguageLabel(locale, choice)}</p>
-              <span className="rounded-full border border-[var(--line)] bg-[var(--surface-strong)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-                {guideFamilyLabels[guideBookEntries[choice].family][locale]}
-              </span>
-            </div>
-            <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{guideBookEntries[choice].quickSpot[locale]}</p>
+            {typeof choice === 'string' ? (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-[var(--ink)]">{getLanguageLabel(locale, choice)}</p>
+                  <span className="rounded-full border border-[var(--line)] bg-[var(--surface-strong)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+                    {guideFamilyLabels[guideBookEntries[choice].family][locale]}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{guideBookEntries[choice].quickSpot[locale]}</p>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-[var(--ink)]">{choice.label[locale]}</p>
+                  <span className="rounded-full border border-[var(--line)] bg-[var(--surface-strong)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+                    {formatCopy.culpritLabel}
+                  </span>
+                </div>
+                <p className="mt-2 font-mono text-sm leading-7 text-[var(--muted)]">{choice.fragment}</p>
+              </>
+            )}
           </div>
         </div>
       </button>
@@ -1059,10 +1400,25 @@ function App() {
       return null
     }
 
-    const answerGuide = guideBookEntries[currentQuestion.answer]
-    const selectedChoiceLabel = currentOutcome?.selectedChoice
-      ? getLanguageLabel(locale, currentOutcome.selectedChoice)
-      : copy.noChoice
+    const answerGuide =
+      currentQuestion.format === 'identify-language'
+        ? guideBookEntries[currentQuestion.answer]
+        : guideBookEntries[currentQuestion.language]
+    const selectedChoiceLabel =
+      currentQuestion.format === 'identify-language'
+        ? currentOutcome?.selectedChoice
+          ? getLanguageLabel(locale, currentOutcome.selectedChoice as LanguageId)
+          : copy.noChoice
+        : currentOutcome?.selectedChoice
+          ? (() => {
+              const selectedChoice = currentQuestion.choices.find((choice) => choice.id === currentOutcome.selectedChoice)
+              return selectedChoice ? `${selectedChoice.label[locale]}: ${selectedChoice.fragment}` : copy.noChoice
+            })()
+          : copy.noChoice
+    const correctFixErrorChoice =
+      currentQuestion.format === 'fix-error'
+        ? currentQuestion.choices.find((choice) => choice.id === currentQuestion.answer) ?? currentQuestion.choices[0]
+        : null
 
     return (
       <motion.section key="quiz" {...screenMotion} className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_360px]">
@@ -1076,7 +1432,10 @@ function App() {
                     {currentTrack.label[locale]}
                   </span>
                   <span className="rounded-full border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-1 text-xs font-semibold text-[var(--muted)]">
-                    {mode.label[locale]}
+                    {currentFormatLabel}
+                  </span>
+                  <span className="rounded-full border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-1 text-xs font-semibold text-[var(--muted)]">
+                    {currentModeLabel}
                   </span>
                   <span className="rounded-full border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-1 text-xs font-semibold text-[var(--muted)]">
                     {copy.question} {currentIndex + 1} {copy.of} {questions.length}
@@ -1114,18 +1473,18 @@ function App() {
 
             <div className="mt-6 rounded-[28px] border border-[var(--line)] bg-[var(--surface-strong)]/94 p-4 md:p-5">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">{copy.snippetLabel}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">{currentQuestionLabel}</p>
                 <span className="rounded-full border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-1 text-xs font-semibold text-[var(--muted)]">
-                  {answerGuide.family}
+                  {guideFamilyLabels[answerGuide.family][locale]}
                 </span>
               </div>
-              <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{copy.snippetHint}</p>
+              <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{currentQuestionHint}</p>
               <div className="mt-4">
                 <SyntaxSnippet
                   code={currentQuestion.snippetText}
-                  languageId={currentQuestion.answer}
+                  languageId={currentQuestion.format === 'identify-language' ? currentQuestion.answer : currentQuestion.language}
                   theme={theme}
-                  label={copy.snippetLabel}
+                  label={currentQuestionLabel}
                   copyLabel={copy.copyCode}
                   copiedLabel={copy.copiedCode}
                   mode="neutral"
@@ -1133,11 +1492,25 @@ function App() {
                 />
               </div>
             </div>
+
+            {isFixErrorQuestion(currentQuestion) && (
+              <div className="mt-6 rounded-[28px] border border-[var(--line)] bg-[var(--surface-raised)] p-4 md:p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">{formatCopy.errorTextLabel}</p>
+                  <span className="rounded-full border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-1 text-xs font-semibold text-[var(--muted)]">
+                    {answerGuide.label[locale]}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm leading-7 text-[var(--ink)]">{currentQuestion.errorText[locale]}</p>
+              </div>
+            )}
           </article>
 
           <article className={panelClass}>
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">{copy.choicesLabel}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
+                {isFixErrorQuestion(currentQuestion) ? formatCopy.culpritLabel : copy.choicesLabel}
+              </p>
               {quizPhase === 'feedback' && <span className="text-xs text-[var(--muted)]">{copy.answerLocked}</span>}
             </div>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">{currentQuestion.choices.map((choice, index) => renderChoiceCard(choice, index))}</div>
@@ -1182,7 +1555,9 @@ function App() {
             {quizPhase === 'active' && (
               <div className="mt-4 rounded-[24px] border border-[var(--line)] bg-[var(--surface-raised)] p-4">
                 <p className="text-sm font-semibold text-[var(--ink)]">{answerGuide.label[locale]}</p>
-                <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{answerGuide.difficultyHint[locale]}</p>
+                <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+                  {isFixErrorQuestion(currentQuestion) ? answerGuide.debugFocus[locale][0] : answerGuide.difficultyHint[locale]}
+                </p>
               </div>
             )}
           </article>
@@ -1218,10 +1593,16 @@ function App() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{copy.correctAnswer}</p>
-                    <p className="mt-2 text-lg font-semibold text-[var(--ink)]">{answerGuide.label[locale]}</p>
+                    {isIdentifyLanguageQuestion(currentQuestion) ? (
+                      <p className="mt-2 text-lg font-semibold text-[var(--ink)]">{answerGuide.label[locale]}</p>
+                    ) : (
+                      <p className="mt-2 text-lg font-semibold text-[var(--ink)]">
+                        {formatCopy.correctLineLabel}: {correctFixErrorChoice?.label[locale]}
+                      </p>
+                    )}
                   </div>
                   <span className="rounded-full border border-[var(--line)] bg-[var(--surface-strong)] px-3 py-1 text-xs font-semibold text-[var(--accent)]">
-                    {answerGuide.quickSpot[locale]}
+                    {isIdentifyLanguageQuestion(currentQuestion) ? answerGuide.quickSpot[locale] : correctFixErrorChoice?.fragment}
                   </span>
                 </div>
                 <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
@@ -1234,6 +1615,29 @@ function App() {
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{copy.whyThisWorks}</p>
                   <p className="mt-3 text-sm leading-7 text-[var(--ink)]">{buildCorrectSummary(locale, currentQuestion)}</p>
                 </div>
+
+                {isFixErrorQuestion(currentQuestion) && (
+                  <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface-raised)] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{formatCopy.choiceWhyLabel}</p>
+                    <div className="mt-3 space-y-3">
+                      {currentQuestion.choices.map((choice) => {
+                        const explanation =
+                          choice.id === currentQuestion.answer
+                            ? currentQuestion.explanation.correct[locale]
+                            : currentQuestion.explanation.wrongChoices[choice.id]?.[locale]
+
+                        return (
+                          <div key={`${currentQuestion.id}-${choice.id}`} className="rounded-[18px] border border-[var(--line)] bg-[var(--surface-strong)] p-3">
+                            <p className="text-sm font-semibold text-[var(--ink)]">
+                              {choice.label[locale]}: <span className="font-mono">{choice.fragment}</span>
+                            </p>
+                            <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{explanation}</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface-raised)] p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{copy.debugFocus}</p>
@@ -1282,7 +1686,8 @@ function App() {
     const weakTopics = Object.entries(
       outcomes.reduce<Record<string, number>>((totals, outcome) => {
         if (!outcome.isCorrect) {
-          totals[outcome.answer] = (totals[outcome.answer] ?? 0) + 1
+          const topicId = outcome.format === 'identify-language' ? outcome.answer : outcome.language
+          totals[topicId] = (totals[topicId] ?? 0) + 1
         }
 
         return totals
@@ -1408,18 +1813,19 @@ function App() {
                   <p className="mt-2 text-lg font-semibold text-[var(--ink)]">{currentTrack.label[locale]}</p>
                 </div>
                 <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface-strong)]/78 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{copy.modeLabel}</p>
-                  <p className="mt-2 text-lg font-semibold text-[var(--ink)]">{mode.label[locale]}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{formatCopy.formatLabel}</p>
+                  <p className="mt-2 text-lg font-semibold text-[var(--ink)]">{currentFormatLabel}</p>
                 </div>
                 <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface-strong)]/78 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{copy.hintsLeft}</p>
-                  <p className="mt-2 text-lg font-semibold text-[var(--ink)]">{breakdown.hintsUsed}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">{formatCopy.profileLabel}</p>
+                  <p className="mt-2 text-lg font-semibold text-[var(--ink)]">{currentModeLabel}</p>
                 </div>
               </div>
             </article>
 
             <article className={panelClass}>
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">{copy.analyticsNote}</p>
+              {isFixErrorMode && <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{formatCopy.fixErrorResultNote}</p>}
               {weakTopics.length > 0 ? (
                 <div className="mt-4 space-y-3">
                   {weakTopics.map(([topicId, count]) => (
@@ -1452,7 +1858,7 @@ function App() {
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">{copy.graphTitle}</p>
           <div className="mt-5">
             <Suspense fallback={chartFallback}>
-              <QuizStatsCharts locale={locale} outcomes={outcomes} score={score} total={QUESTIONS_PER_SESSION} />
+              <QuizStatsCharts locale={locale} outcomes={outcomes} score={score} total={questions.length || formatConfig.questionsPerSession} />
             </Suspense>
           </div>
         </article>

@@ -7,17 +7,21 @@ import csharp from 'react-syntax-highlighter/dist/esm/languages/prism/csharp'
 import css from 'react-syntax-highlighter/dist/esm/languages/prism/css'
 import dart from 'react-syntax-highlighter/dist/esm/languages/prism/dart'
 import glsl from 'react-syntax-highlighter/dist/esm/languages/prism/glsl'
+import go from 'react-syntax-highlighter/dist/esm/languages/prism/go'
 import java from 'react-syntax-highlighter/dist/esm/languages/prism/java'
 import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript'
 import json from 'react-syntax-highlighter/dist/esm/languages/prism/json'
 import jsx from 'react-syntax-highlighter/dist/esm/languages/prism/jsx'
+import kotlin from 'react-syntax-highlighter/dist/esm/languages/prism/kotlin'
 import lua from 'react-syntax-highlighter/dist/esm/languages/prism/lua'
 import markup from 'react-syntax-highlighter/dist/esm/languages/prism/markup'
 import php from 'react-syntax-highlighter/dist/esm/languages/prism/php'
 import python from 'react-syntax-highlighter/dist/esm/languages/prism/python'
+import ruby from 'react-syntax-highlighter/dist/esm/languages/prism/ruby'
 import rust from 'react-syntax-highlighter/dist/esm/languages/prism/rust'
 import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql'
 import { oneLight, vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import swift from 'react-syntax-highlighter/dist/esm/languages/prism/swift'
 import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript'
 import type { LanguageId } from '../data/questionBank'
 
@@ -36,6 +40,7 @@ type SyntaxSnippetProps = {
 const syntaxLanguageMap: Record<LanguageId, string> = {
   python: 'python',
   java: 'java',
+  javascript: 'javascript',
   html: 'markup',
   css: 'css',
   json: 'json',
@@ -43,6 +48,10 @@ const syntaxLanguageMap: Record<LanguageId, string> = {
   cpp: 'cpp',
   flutter: 'dart',
   dart: 'dart',
+  go: 'go',
+  kotlin: 'kotlin',
+  swift: 'swift',
+  ruby: 'ruby',
   jsx: 'jsx',
   typescript: 'typescript',
   bash: 'bash',
@@ -61,6 +70,10 @@ const syntaxLanguageMap: Record<LanguageId, string> = {
   'phaser-typescript': 'typescript',
   'rpg-maker-js': 'javascript',
   'gamemaker-gml': 'javascript',
+  'defold-lua': 'lua',
+  'cocos-typescript': 'typescript',
+  'bevy-rust': 'rust',
+  'renpy-python': 'python',
 }
 
 SyntaxHighlighter.registerLanguage('bash', bash)
@@ -69,16 +82,20 @@ SyntaxHighlighter.registerLanguage('csharp', csharp)
 SyntaxHighlighter.registerLanguage('css', css)
 SyntaxHighlighter.registerLanguage('dart', dart)
 SyntaxHighlighter.registerLanguage('glsl', glsl)
+SyntaxHighlighter.registerLanguage('go', go)
 SyntaxHighlighter.registerLanguage('java', java)
 SyntaxHighlighter.registerLanguage('javascript', javascript)
 SyntaxHighlighter.registerLanguage('json', json)
 SyntaxHighlighter.registerLanguage('jsx', jsx)
+SyntaxHighlighter.registerLanguage('kotlin', kotlin)
 SyntaxHighlighter.registerLanguage('lua', lua)
 SyntaxHighlighter.registerLanguage('markup', markup)
 SyntaxHighlighter.registerLanguage('php', php)
 SyntaxHighlighter.registerLanguage('python', python)
+SyntaxHighlighter.registerLanguage('ruby', ruby)
 SyntaxHighlighter.registerLanguage('rust', rust)
 SyntaxHighlighter.registerLanguage('sql', sql)
+SyntaxHighlighter.registerLanguage('swift', swift)
 SyntaxHighlighter.registerLanguage('typescript', typescript)
 
 export function SyntaxSnippet({

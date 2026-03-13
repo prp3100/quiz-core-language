@@ -48,7 +48,7 @@ export const uiText = {
     readyDescription: 'เริ่มจากอ่าน guide ก่อน แล้วค่อยกด quiz เมื่อพร้อม',
     introRules: [
       'แต่ละ track แบ่ง easy/hard และใช้เวลา 30 วินาทีต่อข้อเหมือนกัน',
-      'core track มี 16 หัวข้อ ส่วน game-dev มี 11 game stacks',
+      'core track มี 21 หัวข้อ ส่วน game-dev มี 15 game stacks',
       'ทุกคำตอบมีเฉลยทันที พร้อมเหตุผลว่าทำไม choice อื่นไม่ใช่',
       'อ่าน guide แล้วจะช่วยเดา marker ได้เร็วขึ้นมาก',
     ],
@@ -158,7 +158,7 @@ export const uiText = {
     readyDescription: 'Read the guide first, then launch the quiz when you are ready.',
     introRules: [
       'Each track has easy and hard modes, and both use the same 30-second timer per question.',
-      'The core track has 16 topics, while game-dev has 11 game stacks.',
+      'The core track has 21 topics, while game-dev has 15 game stacks.',
       'Every answer reveals immediate feedback and explains why the other choices are wrong.',
       'Reading the guide first makes spotting markers much faster.',
     ],

@@ -1,4 +1,5 @@
 import { createGameQuestionSet } from './gameQuestionFactory'
+import { gameEasyQuestionBankExtensions } from './gameEasyExtensions'
 import type { QuestionBankItem } from './quizModels'
 
 export const gameEasyQuestionBank: QuestionBankItem[] = [
@@ -647,4 +648,5 @@ console.log(actor.name())`,
       signals: ['place_meeting', 'vspeed', 'obj_wall'],
     },
   ]),
+  ...gameEasyQuestionBankExtensions,
 ]

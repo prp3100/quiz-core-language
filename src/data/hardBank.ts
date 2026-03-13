@@ -1,4 +1,5 @@
 import { createQuestionSet, type QuestionBankItem } from './quizModels'
+import { coreHardQuestionBankExtensions } from './coreHardExtensions'
 
 export const hardQuestionBank: QuestionBankItem[] = [
   ...createQuestionSet('hard', 'python', [
@@ -961,4 +962,5 @@ impl Renderable for QuizCard {
       signals: ['trait', 'impl ... for', '&self', 'format!'],
     },
   ]),
+  ...coreHardQuestionBankExtensions,
 ]

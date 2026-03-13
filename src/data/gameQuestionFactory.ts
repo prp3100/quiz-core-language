@@ -52,6 +52,22 @@ const topicDistractorSets: Record<GameLanguageId, [LanguageId, LanguageId, Langu
     ['roblox-lua', 'love2d-lua', 'godot-gdscript'],
     ['roblox-lua', 'phaser-typescript', 'rpg-maker-js'],
   ],
+  'defold-lua': [
+    ['love2d-lua', 'roblox-lua', 'godot-gdscript'],
+    ['love2d-lua', 'cocos-typescript', 'gamemaker-gml'],
+  ],
+  'cocos-typescript': [
+    ['phaser-typescript', 'typescript', 'unity-csharp'],
+    ['phaser-typescript', 'defold-lua', 'godot-gdscript'],
+  ],
+  'bevy-rust': [
+    ['rust', 'unreal-cpp', 'godot-gdscript'],
+    ['rust', 'unity-csharp', 'cocos-typescript'],
+  ],
+  'renpy-python': [
+    ['python', 'rpg-maker-js', 'godot-gdscript'],
+    ['python', 'love2d-lua', 'defold-lua'],
+  ],
 }
 
 export const createGameQuestionSet = (

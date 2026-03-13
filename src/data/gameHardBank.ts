@@ -1,4 +1,5 @@
 import { createGameQuestionSet } from './gameQuestionFactory'
+import { gameHardQuestionBankExtensions } from './gameHardExtensions'
 import type { QuestionBankItem } from './quizModels'
 
 export const gameHardQuestionBank: QuestionBankItem[] = [
@@ -782,4 +783,5 @@ draw_text(x, y - 32, string(score));`,
       signals: ['draw_set_color', 'draw_text', 'string(score)', 'x, y - 32'],
     },
   ]),
+  ...gameHardQuestionBankExtensions,
 ]
